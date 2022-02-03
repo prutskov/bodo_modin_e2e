@@ -1,14 +1,14 @@
 import time
+from multiprocessing import cpu_count
 
-import modin.experimental.pandas as pd
-
-# import modin.pandas as pd
+import modin.pandas as pd
 import modin.config as cfg
 import xgboost as xgb
 import numpy as np
 
-cfg.Backend.put("omnisci")
-# cfg.StorageFormat.put("omnisci")
+cfg.StorageFormat.put("omnisci")
+cfg.Engine.put("native")
+cfg.IsExperimental.put(True)
 
 
 def clean(ddf):
@@ -164,6 +164,7 @@ def main():
             "subsample": 0.6,
             "gamma": 1,
             "tree_method": "hist",
+            "nthread": cpu_count(),
         },
         dtrain,
         verbose_eval=False,

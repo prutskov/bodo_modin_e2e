@@ -1,5 +1,7 @@
 import time
 
+from multiprocessing import cpu_count
+
 import pandas as pd
 import bodo
 import numpy as np
@@ -179,6 +181,7 @@ if __name__ == "__main__":
                 "subsample": 0.6,
                 "gamma": 1,
                 "tree_method": "hist",
+                "nthread": cpu_count(),
             },
             dtrain,
             num_boost_round=100,
