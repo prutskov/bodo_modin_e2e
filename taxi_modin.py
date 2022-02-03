@@ -1,16 +1,27 @@
 import time
 
-# import modin.experimental.pandas as pd
-import modin.pandas as pd
+import modin.experimental.pandas as pd
+
+# import modin.pandas as pd
 import modin.config as cfg
 import xgboost as xgb
 import numpy as np
 
-# cfg.Backend.put("omnisci")
-cfg.StorageFormat.put("omnisci")
+cfg.Backend.put("omnisci")
+# cfg.StorageFormat.put("omnisci")
+
 
 def clean(ddf):
-    cols_to_drop_2014 = ['vendor_id', 'store_and_fwd_flag', 'payment_type', 'surcharge', 'mta_tax', 'tip_amount', 'tolls_amount', 'total_amount']
+    cols_to_drop_2014 = [
+        "vendor_id",
+        "store_and_fwd_flag",
+        "payment_type",
+        "surcharge",
+        "mta_tax",
+        "tip_amount",
+        "tolls_amount",
+        "total_amount",
+    ]
     ddf = ddf.drop(columns=cols_to_drop_2014)
     return ddf
 
@@ -18,7 +29,6 @@ def clean(ddf):
 def read_data(base_path):
     # Dictionary of required columns and their datatypes
     t = time.time()
-
 
     columns_2014 = [
         "vendor_id",
@@ -38,7 +48,8 @@ def read_data(base_path):
         "mta_tax",
         "tip_amount",
         "tolls_amount",
-        "total_amount"]
+        "total_amount",
+    ]
 
     df_2014 = pd.read_csv(
         base_path + "2014/yellow_tripdata_2014-01.csv",
@@ -110,7 +121,7 @@ def etl(taxi_df):
 
     X_test = taxi_df[taxi_df.day >= 25]
     # Create Y_test with just the fare amount
-    Y_test = X_test[['fare_amount']]
+    Y_test = X_test[["fare_amount"]]
 
     # Drop the fare amount from X_test
     X_test = X_test.drop(columns="fare_amount")
@@ -126,6 +137,7 @@ def main():
     base_path = "/localdisk/benchmark_datasets/yellow-taxi-dataset/"
 
     print("\nread_csv ...")
+    main_t = time.time()
     t = time.time()
     taxi_df = read_data(base_path)
     print("Data read shape: ", taxi_df.shape)
@@ -144,35 +156,39 @@ def main():
     t = time.time()
     dtrain = xgb.DMatrix(X_train, Y_train)
 
-    trained_model = xgb.train({
-        'learning_rate': 0.3,
-        'max_depth': 8,
-        'objective': 'reg:squarederror',
-        'subsample': 0.6,
-        'gamma': 1,
-        'tree_method':'hist'
+    trained_model = xgb.train(
+        {
+            "learning_rate": 0.3,
+            "max_depth": 8,
+            "objective": "reg:squarederror",
+            "subsample": 0.6,
+            "gamma": 1,
+            "tree_method": "hist",
         },
         dtrain,
         verbose_eval=False,
-        num_boost_round=100, evals=[(dtrain, 'train')])
+        num_boost_round=100,
+        evals=[(dtrain, "train")],
+    )
 
     booster = trained_model
-    prediction = pd.Series(booster.predict(xgb.DMatrix(X_test)))
-    print(prediction.shape)
-
-    actual = Y_test['fare_amount'].reset_index(drop=True)
-
-    print(f'prediction:\n{prediction.head()}')
-    print(f'actual:\n{actual.head()}')
-
+    prediction = booster.predict(xgb.DMatrix(X_test))
     print(f"ml time, s: {time.time() - t}")
 
+    prediction = pd.Series(prediction)
+    print(prediction.shape)
+
+    actual = Y_test["fare_amount"].reset_index(drop=True)
+
+    print(f"prediction:\n{prediction.head()}")
+    print(f"actual:\n{actual.head()}")
+
     # Calculate RMSE
-    squared_error = ((prediction-actual)**2)
+    squared_error = (prediction - actual) ** 2
 
     # compute the actual RMSE over the full test set
-    print(f'RMSE: {np.sqrt(squared_error.mean())}')
-
+    print(f"RMSE: {np.sqrt(squared_error.mean())}")
+    print(f"main time, s: {time.time() - main_t}")
 
 
 if __name__ == "__main__":

@@ -8,7 +8,18 @@ import xgboost as xgb
 
 @bodo.jit
 def clean(df):
-    df = df.drop(columns=['vendor_id', 'store_and_fwd_flag', 'payment_type', 'surcharge', 'mta_tax', 'tip_amount', 'tolls_amount', 'total_amount'])
+    df = df.drop(
+        columns=[
+            "vendor_id",
+            "store_and_fwd_flag",
+            "payment_type",
+            "surcharge",
+            "mta_tax",
+            "tip_amount",
+            "tolls_amount",
+            "total_amount",
+        ]
+    )
 
     return df
 
@@ -17,14 +28,26 @@ def clean(df):
 def read_data(base_path):
     t = time.time()
 
-    columns = ["vendor_id",
+    columns = [
+        "vendor_id",
         "pickup_datetime",
-        "dropoff_datetime", "passenger_count",
-        "trip_distance", "pickup_longitude", "pickup_latitude", "rate_code",
-        "store_and_fwd_flag", "dropoff_longitude", "dropoff_latitude", "payment_type",
-        "fare_amount", "surcharge", "mta_tax", "tip_amount",
-        "tolls_amount", "total_amount"]
-  
+        "dropoff_datetime",
+        "passenger_count",
+        "trip_distance",
+        "pickup_longitude",
+        "pickup_latitude",
+        "rate_code",
+        "store_and_fwd_flag",
+        "dropoff_longitude",
+        "dropoff_latitude",
+        "payment_type",
+        "fare_amount",
+        "surcharge",
+        "mta_tax",
+        "tip_amount",
+        "tolls_amount",
+        "total_amount",
+    ]
 
     df = pd.read_csv(
         # base_path + "2014/yellow_tripdata_2014-01.csv",
@@ -98,14 +121,13 @@ def etl(taxi_df):
 
     X_test = taxi_df[taxi_df.day >= 25]
     # Create Y_test with just the fare amount
-    Y_test = X_test[['fare_amount']]
+    Y_test = X_test[["fare_amount"]]
 
     # Drop the fare amount from X_test
     X_test = X_test.drop(columns="fare_amount")
 
     X_test = X_test.drop(columns=["day"])
     X_train = X_train.drop(columns=["day"])
-
 
     print(f"etl time internal, s: {time.time() - t}")
     return X_train, Y_train, X_test, Y_test
@@ -129,7 +151,12 @@ def data_processing():
     print("X test shape: ", X_test.shape)
     print(f"etl time, s: {time.time() - t}")
 
-    return bodo.gatherv(X_train), bodo.gatherv(Y_train), bodo.gatherv(X_test), bodo.gatherv(Y_test)
+    return (
+        bodo.gatherv(X_train),
+        bodo.gatherv(Y_train),
+        bodo.gatherv(X_test),
+        bodo.gatherv(Y_test),
+    )
 
 
 if __name__ == "__main__":
@@ -137,40 +164,43 @@ if __name__ == "__main__":
 
     t = time.time()
     X_train, Y_train, X_test, Y_test = data_processing()
+    print(f"data_processing time: {time.time() - t} s")
 
     if bodo.get_rank() == 0:
         print("\nml ...")
         tt = time.time()
         dtrain = xgb.DMatrix(X_train, Y_train)
 
-        trained_model = xgb.train({
-            'learning_rate': 0.3,
-            'max_depth': 8,
-            'objective': 'reg:squarederror',
-            'subsample': 0.6,
-            'gamma': 1,
-            'tree_method':'hist'
+        trained_model = xgb.train(
+            {
+                "learning_rate": 0.3,
+                "max_depth": 8,
+                "objective": "reg:squarederror",
+                "subsample": 0.6,
+                "gamma": 1,
+                "tree_method": "hist",
             },
             dtrain,
             num_boost_round=100,
             verbose_eval=False,
-            evals=[(dtrain, 'train')])
+            evals=[(dtrain, "train")],
+        )
 
         booster = trained_model
-        prediction = pd.Series(booster.predict(xgb.DMatrix(X_test)))
-        print(prediction.shape)
-
-        actual = Y_test['fare_amount'].reset_index(drop=True)
-
-        print(f'prediction:\n{prediction.head()}')
-        print(f'actual:\n{actual.head()}')
-
+        prediction = booster.predict(xgb.DMatrix(X_test))
         print(f"ml time, s: {time.time() - tt}")
 
+        prediction = pd.Series(prediction)
+        print(prediction.shape)
+
+        actual = Y_test["fare_amount"].reset_index(drop=True)
+
+        print(f"prediction:\n{prediction.head()}")
+        print(f"actual:\n{actual.head()}")
+
         # Calculate RMSE
-        squared_error = ((prediction-actual)**2)
+        squared_error = (prediction - actual) ** 2
 
         # compute the actual RMSE over the full test set
-        print(f'RMSE: {np.sqrt(squared_error.mean())}')
+        print(f"RMSE: {np.sqrt(squared_error.mean())}")
         print(f"main time, s: {time.time() - t}")
-
