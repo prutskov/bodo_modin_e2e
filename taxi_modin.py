@@ -1,28 +1,17 @@
 import time
 
+# import modin.experimental.pandas as pd
 import modin.pandas as pd
+import modin.config as cfg
 import xgboost as xgb
-
 import numpy as np
-# import sklearn as skl
-# from sklearnex import patch_sklearn
 
-# patch_sklearn()
-
+# cfg.Backend.put("omnisci")
+cfg.StorageFormat.put("omnisci")
 
 def clean(ddf):
     cols_to_drop_2014 = ['vendor_id', 'store_and_fwd_flag', 'payment_type', 'surcharge', 'mta_tax', 'tip_amount', 'tolls_amount', 'total_amount']
-
-    ddf = ddf.rename(
-        columns={
-            "tpep_pickup_datetime": "pickup_datetime",
-            "tpep_dropoff_datetime": "dropoff_datetime",
-            "ratecodeid": "rate_code",
-        }
-    )
-
     ddf = ddf.drop(columns=cols_to_drop_2014)
-
     return ddf
 
 
@@ -53,12 +42,12 @@ def read_data(base_path):
 
     df_2014 = pd.read_csv(
         base_path + "2014/yellow_tripdata_2014-01.csv",
-        # base_path + "2014/yellow_tripdata_2014-01.csv",
+        # base_path + "yellow_tripdata_2014.csv",
+        # "/localdisk/aprutsko/datasets/nyc_taxi_data.csv",
         parse_dates=["pickup_datetime", "dropoff_datetime"],
         names=columns_2014,
         header=0,
     )
-
     df_2014 = clean(df_2014)
 
     print(f"read time internal, s: {time.time() - t}")
@@ -111,7 +100,7 @@ def etl(taxi_df):
     # Bodo can't use this columns
     taxi_df = taxi_df.drop(columns=["passenger_count", "rate_code"])
 
-
+    taxi_df.shape
     X_train = taxi_df[taxi_df.day < 25]
     # create a Y_train ddf with just the target variable
     Y_train = X_train[["fare_amount"]]
@@ -134,7 +123,6 @@ def etl(taxi_df):
 
 
 def main():
-    # base_path = "s3://arn:aws:s3:us-east-1:980842202052:accesspoint/yellow-taxi-dataset"
     base_path = "/localdisk/benchmark_datasets/yellow-taxi-dataset/"
 
     print("\nread_csv ...")
@@ -172,7 +160,6 @@ def main():
     prediction = pd.Series(booster.predict(xgb.DMatrix(X_test)))
     print(prediction.shape)
 
-    # prediction = prediction.map_partitions(lambda part: cudf.Series(part)).reset_index(drop=True)
     actual = Y_test['fare_amount'].reset_index(drop=True)
 
     print(f'prediction:\n{prediction.head()}')

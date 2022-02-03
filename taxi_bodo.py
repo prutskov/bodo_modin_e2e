@@ -2,36 +2,15 @@ import time
 
 import pandas as pd
 import bodo
-
 import numpy as np
 import xgboost as xgb
 
 
 @bodo.jit
-def clean(ddf):
-    cols_to_drop_2014 = ['vendor_id', 'store_and_fwd_flag', 'payment_type', 'surcharge', 'mta_tax', 'tip_amount', 'tolls_amount', 'total_amount']
-    # cols_to_drop_2015_2016 = ['vendorid', 'store_and_fwd_flag', 'payment_type', 'extra', 'mta_tax', 'tip_amount', 'tolls_amount', 'improvement_surcharge', 'total_amount']
+def clean(df):
+    df = df.drop(columns=['vendor_id', 'store_and_fwd_flag', 'payment_type', 'surcharge', 'mta_tax', 'tip_amount', 'tolls_amount', 'total_amount'])
 
-    # columns_to_rename = cols_to_rename_2014
-    # columns_to_drop = cols_to_drop_2014
-
-    # if year == ("2015" or "2016"):
-    #     columns_to_rename = cols_to_rename_2015_2016
-    #     columns_to_drop = cols_to_drop_2015_2016
-
-    # ddf = ddf.rename(columns=cols_to_rename_2014)
-
-    ddf = ddf.rename(
-        columns={
-            "tpep_pickup_datetime": "pickup_datetime",
-            "tpep_dropoff_datetime": "dropoff_datetime",
-            "ratecodeid": "rate_code",
-        }
-    )
-
-    ddf = ddf.drop(columns=cols_to_drop_2014)
-
-    return ddf
+    return df
 
 
 @bodo.jit
@@ -47,19 +26,20 @@ def read_data(base_path):
         "tolls_amount", "total_amount"]
   
 
-    df_2014 = pd.read_csv(
-        base_path + "2014/yellow_tripdata_2014-01.csv",
+    df = pd.read_csv(
+        # base_path + "2014/yellow_tripdata_2014-01.csv",
+        "/localdisk/aprutsko/datasets/nyc_taxi_data.csv",
         parse_dates=["pickup_datetime", "dropoff_datetime"],
         names=columns,
         header=0,
     )
 
-    df_2014 = clean(df_2014)
-    # df_2015 = clean(df_2015)
-    # df_2016 = clean(df_2016)
-    # taxi_df = pd.concat([df_2014, df_2015, df_2016], ignore_index=True)
+    df = clean(df)
+
+    # Force computations
+    print(df)
     print(f"read time internal, s: {time.time() - t}")
-    return df_2014
+    return df
 
 
 @bodo.jit
@@ -131,7 +111,7 @@ def etl(taxi_df):
     return X_train, Y_train, X_test, Y_test
 
 
-@bodo.jit  # (cache=True)
+@bodo.jit
 def data_processing():
     base_path = "/localdisk/benchmark_datasets/yellow-taxi-dataset/"
 
@@ -180,7 +160,6 @@ if __name__ == "__main__":
         prediction = pd.Series(booster.predict(xgb.DMatrix(X_test)))
         print(prediction.shape)
 
-        # prediction = prediction.map_partitions(lambda part: cudf.Series(part)).reset_index(drop=True)
         actual = Y_test['fare_amount'].reset_index(drop=True)
 
         print(f'prediction:\n{prediction.head()}')
